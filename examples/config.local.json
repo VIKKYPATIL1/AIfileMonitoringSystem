@@ -1,0 +1,21 @@
+{
+  "watch_dir": "data/futures",
+  "processing_dir": "data/futures/processing",
+  "accepted_dir": "data/futures/accepted",
+  "rejected_dir": "data/futures/rejected",
+  "archive_dir": "data/futures/archive",
+  "reason_dir": "data/futures/reasons",
+  "rule_file": "examples/rules.futures.json",
+  "database_load_enabled": false,
+  "dry_run_load_path": "data/futures/loaded/accepted_rows.csv",
+  "poll_seconds": 5,
+  "stable_seconds": 2,
+  "chunk_size": 5000,
+  "max_workers": 4,
+  "input_glob": "*.csv",
+  "ai_fail_closed": true,
+  "openai_compatible_base_url": "https://your-model-gateway.example.com/v1",
+  "openai_compatible_model": "qwen-or-gpt-oss-or-gemma",
+  "llm_timeout_seconds": 120,
+  "llm_temperature": 0.0
+}
