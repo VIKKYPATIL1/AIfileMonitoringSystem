@@ -1,0 +1,29 @@
+{
+  "version": "2026-05-16",
+  "columns": {
+    "trade_id": {"type": "string", "required": true, "regex": "[A-Z0-9-]{6,30}"},
+    "business_date": {"type": "date", "required": true, "format": "%Y-%m-%d"},
+    "symbol": {"type": "string", "required": true, "allowed": ["ES", "NQ", "CL", "GC"]},
+    "side": {"type": "string", "required": true, "allowed": ["BUY", "SELL"]},
+    "quantity": {"type": "integer", "required": true, "min": 1, "max": 100000},
+    "price": {"type": "decimal", "required": true, "min": "0.01", "max": "1000000"},
+    "currency": {"type": "string", "required": true, "allowed": ["USD"]}
+  },
+  "combinations": [
+    {
+      "name": "energy_contract_price_band",
+      "expression": "symbol != 'CL' or price <= 500",
+      "reason": "Crude oil futures price is outside approved operational band"
+    },
+    {
+      "name": "gold_currency",
+      "expression": "symbol != 'GC' or currency == 'USD'",
+      "reason": "Gold futures must be loaded in USD"
+    }
+  ],
+  "adaptive": {
+    "suggestion_threshold": 10,
+    "auto_apply": false,
+    "review_required": true
+  }
+}
