@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aifilemonitoring"
+version = "0.1.0"
+description = "Adaptive AI-assisted file monitoring and validation pipeline for database loading"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Chetan Pravin Kachave"}]
+dependencies = ["langgraph>=1.0"]
+
+[project.optional-dependencies]
+oracle = ["oracledb>=2.0"]
+watchdog = ["watchdog>=4.0"]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+ai-file-monitor = "aifilemonitoring.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
