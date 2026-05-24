@@ -12,8 +12,14 @@ class FakeAdaptiveClient:
     def complete_json(self, system_prompt: str, user_payload: dict[str, Any]) -> dict[str, Any]:
         return {
             "executive_summary": "Pattern repeated across files.",
-            "pattern_decisions": [{"decision": "changed_business_rule"}],
-            "proposed_rule_changes": [],
+            "pattern_decisions": [
+                {
+                    "decision": "changed_business_rule",
+                    "reason": "ABC appears repeatedly and may now be approved.",
+                    "recommended_change": "Add ABC to the approved symbol list after owner approval.",
+                }
+            ],
+            "proposed_rule_changes": [{"suggested_change": "Add ABC to symbol.allowed"}],
             "proposed_schema_changes": [],
             "approval_questions": ["Should this rule be changed?"],
         }
@@ -46,3 +52,25 @@ def test_adaptive_threshold_counts_files_not_rows(tmp_path: Path) -> None:
     assert second_file["llm_status"] == "used"
     history = json.loads((tmp_path / "adaptive_history.json").read_text(encoding="utf-8"))
     assert history["patterns"]["symbol|allowed|Value is not in allowed list"]["file_count"] == 2
+
+
+def test_adaptive_suggestions_write_reviewer_table(tmp_path: Path) -> None:
+    rules = RuleSet(
+        version="test",
+        columns={"symbol": {"type": "string", "required": True, "allowed": ["ES", "CL"]}},
+        adaptive={"suggestion_threshold": 1},
+    )
+    advisor = AdaptiveRuleAdvisor(rules, tmp_path / "adaptive_history.json", FakeAdaptiveClient())  # type: ignore[arg-type]
+    suggestions_path = tmp_path / "day1.adaptive_suggestions.json"
+
+    advisor.write_suggestions(suggestions_path, "day1.csv", [_error(2)])
+
+    table_path = tmp_path / "day1.adaptive_suggestions_table.csv"
+    assert suggestions_path.exists()
+    assert table_path.exists()
+    table = table_path.read_text(encoding="utf-8")
+    assert "Column name,Accepted format,Received value from file,Description,New change needed if accepted" in table
+    assert "symbol" in table
+    assert "allowed=ES, CL" in table
+    assert "ABC" in table
+    assert "Add ABC to symbol.allowed" in table

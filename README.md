@@ -168,6 +168,13 @@ The system does not silently weaken controls. It learns from repeated failures b
 
 When an OpenAI-compatible client is configured, the adaptive advisor asks the model to classify each recurring pattern as likely bad source data, changed business rule, or possible database schema change. The AI response is written into the adaptive suggestion JSON with proposed rule changes, proposed schema changes, and approval questions.
 
+Each adaptive suggestion also creates reviewer-friendly table artifacts beside the JSON:
+
+- `*.adaptive_suggestions_table.csv`
+- `*.adaptive_suggestions_table.png`
+
+The table columns are `Column name`, `Accepted format`, `Received value from file`, `Description`, and `New change needed if accepted`, so reviewers can inspect the business decision without reading the full JSON payload.
+
 Recommended operating model:
 
 1. Keep deterministic rules as the source of truth.
