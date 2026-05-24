@@ -15,7 +15,9 @@ class PipelineConfig:
     rejected_dir: Path = Path("/data/futures/rejected")
     archive_dir: Path = Path("/data/futures/archive")
     reason_dir: Path = Path("/data/futures/reasons")
+    analytics_dir: Path = Path("/data/futures/analytics")
     rule_file: Path = Path("rules.json")
+    adaptive_history_path: Path | None = None
     poll_seconds: float = 5.0
     stable_seconds: float = 2.0
     chunk_size: int = 5_000
@@ -45,10 +47,13 @@ class PipelineConfig:
             self.rejected_dir,
             self.archive_dir,
             self.reason_dir,
+            self.analytics_dir,
         ):
             directory.mkdir(parents=True, exist_ok=True)
         if self.dry_run_load_path:
             self.dry_run_load_path.parent.mkdir(parents=True, exist_ok=True)
+        if self.adaptive_history_path:
+            self.adaptive_history_path.parent.mkdir(parents=True, exist_ok=True)
 
 
 @dataclass(slots=True)

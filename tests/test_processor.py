@@ -51,6 +51,7 @@ def test_processor_loads_valid_rows_and_writes_rejections(tmp_path: Path) -> Non
         rejected_dir=tmp_path / "rejected",
         archive_dir=tmp_path / "archive",
         reason_dir=tmp_path / "reasons",
+        analytics_dir=tmp_path / "analytics",
         rule_file=rules,
         database_load_enabled=True,
         dry_run_load_path=tmp_path / "loaded" / "rows.csv",
@@ -70,6 +71,8 @@ def test_processor_loads_valid_rows_and_writes_rejections(tmp_path: Path) -> Non
     reasons = json.loads((tmp_path / "reasons" / "trades.reasons.json").read_text(encoding="utf-8"))
     assert {reason["rule"] for reason in reasons} == {"combination", "allowed", "min"}
     assert (tmp_path / "reasons" / "trades.adaptive_suggestions.json").exists()
+    assert (tmp_path / "reasons" / "adaptive_history.json").exists()
+    assert (tmp_path / "analytics" / "trades.analytics.json").exists()
 
 
 def test_processor_can_skip_database_loading(tmp_path: Path) -> None:
@@ -85,6 +88,7 @@ def test_processor_can_skip_database_loading(tmp_path: Path) -> None:
         rejected_dir=tmp_path / "rejected",
         archive_dir=tmp_path / "archive",
         reason_dir=tmp_path / "reasons",
+        analytics_dir=tmp_path / "analytics",
         rule_file=rules,
         database_load_enabled=False,
         dry_run_load_path=tmp_path / "loaded" / "rows.csv",

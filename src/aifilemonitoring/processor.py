@@ -10,6 +10,7 @@ from pathlib import Path
 from .adaptive import AdaptiveRuleAdvisor
 from .agents import ValidationAgentPool
 from .ai_validation import AgenticAIValidator
+from .analytics import RejectionAnalyticsReporter
 from .llm import OpenAICompatibleClient
 from .loaders import CsvDryRunLoader, Loader, OracleLoader
 from .models import PipelineConfig, ValidatedRow
@@ -24,9 +25,18 @@ class FileProcessor:
         self.config.ensure_directories()
         self.rules = load_rules(config.rule_file)
         self.engine = RuleEngine(self.rules)
+        self.llm_client = OpenAICompatibleClient.from_env(
+            config.openai_compatible_base_url,
+            config.openai_compatible_api_key,
+            config.openai_compatible_model,
+            config.llm_timeout_seconds,
+            config.llm_temperature,
+        )
         self.agent_pool = self._build_validation_pool(config)
         self.loader = (loader or self._build_loader(config)) if config.database_load_enabled else None
-        self.advisor = AdaptiveRuleAdvisor(self.rules)
+        history_path = config.adaptive_history_path or config.reason_dir / "adaptive_history.json"
+        self.advisor = AdaptiveRuleAdvisor(self.rules, history_path, self.llm_client)
+        self.analytics = RejectionAnalyticsReporter(self.rules, self.llm_client)
 
     def process(self, input_path: Path) -> dict[str, int | str]:
         processing_path = self._move_to_processing(input_path)
@@ -38,7 +48,7 @@ class FileProcessor:
         if accepted_rows:
             self._write_csv(self.config.accepted_dir / processing_path.name, accepted_rows, fieldnames)
         if rejected:
-            self._write_rejected(processing_path, rejected, fieldnames)
+            self._write_rejected(processing_path, rejected, fieldnames, len(accepted_rows))
         archive_path = self.config.archive_dir / processing_path.name
         shutil.move(str(processing_path), archive_path)
         return {
@@ -52,17 +62,10 @@ class FileProcessor:
     def _build_validation_pool(self, config: PipelineConfig) -> ValidationAgentPool | AgenticAIValidator:
         if not config.ai_validation_enabled:
             return ValidationAgentPool(self.engine, config.max_workers, config.chunk_size)
-        client = OpenAICompatibleClient.from_env(
-            config.openai_compatible_base_url,
-            config.openai_compatible_api_key,
-            config.openai_compatible_model,
-            config.llm_timeout_seconds,
-            config.llm_temperature,
-        )
         return AgenticAIValidator(
             self.rules,
             self.engine,
-            client,
+            self.llm_client,
             config.max_workers,
             config.chunk_size,
             config.ai_validation_mode,
@@ -97,7 +100,13 @@ class FileProcessor:
             writer.writeheader()
             writer.writerows(rows)
 
-    def _write_rejected(self, processing_path: Path, rejected: list[ValidatedRow], fieldnames: list[str]) -> None:
+    def _write_rejected(
+        self,
+        processing_path: Path,
+        rejected: list[ValidatedRow],
+        fieldnames: list[str],
+        accepted_count: int,
+    ) -> None:
         rejected_rows = [item.data for item in rejected]
         self._write_csv(self.config.rejected_dir / processing_path.name, rejected_rows, fieldnames)
         errors = [error for item in rejected for error in item.errors]
@@ -106,4 +115,11 @@ class FileProcessor:
             json.dumps([asdict(error) for error in errors], indent=2, default=str), encoding="utf-8"
         )
         suggestions_path = self.config.reason_dir / f"{processing_path.stem}.adaptive_suggestions.json"
-        self.advisor.write_suggestions(suggestions_path, errors)
+        self.advisor.write_suggestions(suggestions_path, processing_path.name, errors)
+        self.analytics.write_report(
+            self.config.analytics_dir,
+            processing_path.stem,
+            accepted_count=accepted_count,
+            rejected_count=len(rejected),
+            errors=errors,
+        )

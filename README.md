@@ -6,13 +6,15 @@ Adaptive, AI-assisted file monitoring pipeline for futures files. The first phas
 
 ```text
 file watcher
-  -> agentic validation graph (LangGraph when installed)
+  -> native LangGraph agentic validation graph
   -> rule interpreter agent
   -> parallel AI chunk validator agents
   -> deterministic guardrail agent
   -> supervisor reconciliation agent
   -> accepted rows -> optional Oracle SQL/dry-run loader
-  -> rejected rows -> rejected CSV + reason JSON + adaptive suggestions
+  -> rejected rows -> rejected CSV + reason JSON
+  -> cumulative adaptive history + AI rule-change review
+  -> AI-planned matplotlib analytics
 ```
 
 The implementation is intentionally platform independent: it uses Python standard-library polling for file watching, a LangGraph-style agent workflow for AI validation, `concurrent.futures` for parallel chunk agents, JSON rule files, and an optional Oracle adapter.
@@ -27,7 +29,10 @@ The implementation is intentionally platform independent: it uses Python standar
 - Applies deterministic cross-column guardrails through a safe expression evaluator instead of unsafe `eval`.
 - Loads only valid rows when `--load-to-database true` is enabled; one bad record does not block the rest of the file.
 - Writes rejected rows to a temporary/rejected file and writes row-level failure reasons to JSON.
-- Produces adaptive rule-change suggestions for repeated patterns, with human approval required by default.
+- Produces adaptive rule-change suggestions for repeated patterns across files, with human approval required by default.
+- Maintains cumulative adaptive history so one large bad file does not look like many days of repeated failures.
+- Uses the configured OpenAI-compatible model to review adaptive rule-change candidates and choose useful rejection analytics charts.
+- Writes analytics JSON and matplotlib PNG charts for accepted/rejected counts, failed rules, failed columns, and rule/column concentration.
 - Supports qwen, gpt-oss, gemma, or other OpenAI-compatible model gateways for validation and review assistance.
 
 ## Project layout
@@ -36,7 +41,8 @@ The implementation is intentionally platform independent: it uses Python standar
 src/aifilemonitoring/
   agents.py       # deterministic parallel validation worker pool
   ai_validation.py # LangGraph-style OpenAI-compatible AI validation agents
-  adaptive.py     # adaptive pattern detection and rule suggestions
+  adaptive.py     # cumulative adaptive pattern detection and AI rule suggestions
+  analytics.py    # AI-planned matplotlib rejection analytics
   cli.py          # command-line entrypoint
   llm.py          # OpenAI-compatible chat-completions client
   loaders.py      # dry-run CSV and Oracle loaders
@@ -127,7 +133,7 @@ export OPENAI_COMPATIBLE_MODEL='qwen-or-gpt-oss-or-gemma'
 ai-file-monitor --config examples/config.local.json --ai-validation --load-to-database false
 ```
 
-When `langgraph` is installed, the same node sequence is compiled as a `StateGraph`; otherwise the project runs the same graph steps locally so development and tests remain lightweight.
+`langgraph` is a runtime dependency. The validator compiles the validation node sequence as a `StateGraph`; the lightweight local graph path remains only as a defensive fallback for constrained test environments.
 
 
 ## Agentic AI validation modes
@@ -158,15 +164,28 @@ Database loading is off by default. Turn it on explicitly from the terminal with
 
 ## Adaptive AI behavior
 
-The system does not silently weaken controls. It learns from repeated failures by generating `*.adaptive_suggestions.json` files beside the reason files. Those suggestions can be reviewed by a human or sent to qwen, gpt-oss, gemma, or another model through the OpenAI-compatible client in `llm.py`.
+The system does not silently weaken controls. It learns from repeated failures by maintaining a cumulative `adaptive_history.json` file and generating `*.adaptive_suggestions.json` only when the same failure pattern appears in enough distinct files. `suggestion_threshold` means **files with the same failure pattern**, not total rejected rows.
+
+When an OpenAI-compatible client is configured, the adaptive advisor asks the model to classify each recurring pattern as likely bad source data, changed business rule, or possible database schema change. The AI response is written into the adaptive suggestion JSON with proposed rule changes, proposed schema changes, and approval questions.
 
 Recommended operating model:
 
 1. Keep deterministic rules as the source of truth.
-2. Let adaptive analysis detect repeated rejection patterns.
-3. Ask the OpenAI-compatible model gateway to explain whether a business rule may have changed.
+2. Let adaptive analysis detect repeated rejection patterns across files.
+3. Ask the OpenAI-compatible model gateway to explain whether a business rule or schema may have changed.
 4. Require data-owner approval before updating the JSON rule file.
 5. Version-control each rule-file change.
+
+## Visual analytics
+
+For files with rejected records, the processor writes an analytics JSON report and matplotlib charts under `analytics_dir`. The AI analytics agent receives accepted/rejected counts, failed-rule counts, failed-column counts, and sample errors, then chooses chart types from a safe renderer allow-list:
+
+- `status_pie`
+- `failed_rules_bar`
+- `failed_columns_bar`
+- `rule_by_column_heatmap`
+
+If no OpenAI-compatible API is configured, the report records `llm_status: not_configured` and renders a conservative default chart set.
 
 ## Development checks
 
