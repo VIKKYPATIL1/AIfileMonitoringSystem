@@ -105,11 +105,20 @@ class AdaptiveRuleAdvisor:
         suggestions = self.suggest(file_name, errors)
         if not suggestions["suggestions"]:
             return
-        path.write_text(json.dumps(suggestions, indent=2, default=str), encoding="utf-8")
         table_rows = self._build_review_table_rows(suggestions)
         table_base_path = self._table_base_path(path)
-        self._write_review_table_csv(table_base_path.parent / f"{table_base_path.name}.csv", table_rows)
-        self._write_review_table_png(table_base_path.parent / f"{table_base_path.name}.png", table_rows)
+        csv_path = table_base_path.parent / f"{table_base_path.name}.csv"
+        png_path = table_base_path.parent / f"{table_base_path.name}.png"
+        csv_status = self._write_review_table_csv(csv_path, table_rows)
+        png_status = self._write_review_table_png(png_path, table_rows)
+        suggestions["review_table"] = {
+            "csv_path": str(csv_path),
+            "csv_status": csv_status,
+            "png_path": str(png_path),
+            "png_status": png_status,
+        }
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(suggestions, indent=2, default=str), encoding="utf-8")
 
     def _build_review_table_rows(self, suggestions: dict[str, Any]) -> list[dict[str, str]]:
         ai_review = suggestions.get("ai_rule_change_review", {})
@@ -213,27 +222,30 @@ class AdaptiveRuleAdvisor:
                 return str(decision[key])
         return f"Human approval required before changing rule '{pattern['rule']}' for column '{pattern['column']}'."
 
-    def _write_review_table_csv(self, path: Path, rows: list[dict[str, str]]) -> None:
+    def _write_review_table_csv(self, path: Path, rows: list[dict[str, str]]) -> str:
         import csv
 
         if not rows:
-            return
+            return "skipped_no_rows"
+        path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", newline="", encoding="utf-8") as stream:
             writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
             writer.writeheader()
             writer.writerows(rows)
+        return "created"
 
-    def _write_review_table_png(self, path: Path, rows: list[dict[str, str]]) -> None:
+    def _write_review_table_png(self, path: Path, rows: list[dict[str, str]]) -> str:
         if not rows:
-            return
+            return "skipped_no_rows"
         try:
             import matplotlib
 
             matplotlib.use("Agg")
             from matplotlib import pyplot as plt
-        except Exception:
-            return
+        except Exception as exc:
+            return f"skipped_matplotlib_unavailable: {exc}"
 
+        path.parent.mkdir(parents=True, exist_ok=True)
         headers = list(rows[0])
         wrapped_rows = [
             [self._wrap_cell(row[header], width=28 if header != "Received value from file" else 18) for header in headers]
@@ -262,6 +274,7 @@ class AdaptiveRuleAdvisor:
         fig.tight_layout()
         fig.savefig(path, dpi=160, bbox_inches="tight")
         plt.close(fig)
+        return "created"
 
     def _wrap_cell(self, value: str, width: int) -> str:
         return "\n".join(textwrap.wrap(str(value), width=width, break_long_words=False)) or ""

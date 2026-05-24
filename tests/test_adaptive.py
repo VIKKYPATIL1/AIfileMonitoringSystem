@@ -66,8 +66,13 @@ def test_adaptive_suggestions_write_reviewer_table(tmp_path: Path) -> None:
     advisor.write_suggestions(suggestions_path, "day1.csv", [_error(2)])
 
     table_path = tmp_path / "day1.adaptive_suggestions_table.csv"
+    suggestions = json.loads(suggestions_path.read_text(encoding="utf-8"))
     assert suggestions_path.exists()
     assert table_path.exists()
+    assert suggestions["review_table"]["csv_status"] == "created"
+    assert suggestions["review_table"]["csv_path"].endswith("day1.adaptive_suggestions_table.csv")
+    assert suggestions["review_table"]["png_path"].endswith("day1.adaptive_suggestions_table.png")
+    assert suggestions["review_table"]["png_status"]
     table = table_path.read_text(encoding="utf-8")
     assert "Column name,Accepted format,Received value from file,Description,New change needed if accepted" in table
     assert "symbol" in table

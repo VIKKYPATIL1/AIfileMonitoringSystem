@@ -175,6 +175,8 @@ Each adaptive suggestion also creates reviewer-friendly table artifacts beside t
 
 The table columns are `Column name`, `Accepted format`, `Received value from file`, `Description`, and `New change needed if accepted`, so reviewers can inspect the business decision without reading the full JSON payload.
 
+The suggestion JSON includes a `review_table` section with the CSV/PNG paths and creation status. If PNG creation is skipped because `matplotlib` is not available in the runtime, the status explains that directly.
+
 Recommended operating model:
 
 1. Keep deterministic rules as the source of truth.
