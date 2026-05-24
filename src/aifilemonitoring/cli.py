@@ -82,7 +82,9 @@ def load_config(config_path: Path | None, args: argparse.Namespace) -> PipelineC
         "rejected_dir",
         "archive_dir",
         "reason_dir",
+        "analytics_dir",
         "rule_file",
+        "adaptive_history_path",
         "dry_run_load_path",
     ]
     for key in path_keys:

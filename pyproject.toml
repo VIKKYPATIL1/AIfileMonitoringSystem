@@ -10,11 +10,10 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [{name = "Chetan Pravin Kachave"}]
-dependencies = []
+dependencies = ["langgraph>=1.0", "matplotlib>=3.8"]
 
 [project.optional-dependencies]
 oracle = ["oracledb>=2.0"]
-ai = ["langgraph>=1.0"]
 watchdog = ["watchdog>=4.0"]
 dev = ["pytest>=8.0"]
 
